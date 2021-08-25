@@ -20,6 +20,10 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.example.android.kotlincoroutines.fakes.MainNetworkFake
 import com.example.android.kotlincoroutines.fakes.TitleDaoFake
 import com.example.android.kotlincoroutines.main.utils.MainCoroutineScopeRule
+import com.example.android.kotlincoroutines.main.utils.getValueForTest
+import com.google.common.truth.Truth
+import junit.framework.Assert
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -27,22 +31,28 @@ import org.junit.Test
 class MainViewModelTest {
     @get:Rule
     val coroutineScope = MainCoroutineScopeRule()
+
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    lateinit var subject: MainViewModel
+    lateinit var viewModel: MainViewModel
 
     @Before
     fun setup() {
-        subject = MainViewModel(
-                TitleRepository(
-                        MainNetworkFake("OK"),
-                        TitleDaoFake("initial")
-                ))
+        viewModel = MainViewModel(
+            TitleRepository(
+                MainNetworkFake("OK"),
+                TitleDaoFake("initial")
+            )
+        )
     }
 
+    @ExperimentalCoroutinesApi
     @Test
     fun whenMainClicked_updatesTaps() {
-        // TODO: Write this
+        viewModel.onMainViewClicked()
+        Truth.assertThat(viewModel.taps.getValueForTest()).isEqualTo("0 taps")
+        coroutineScope.advanceTimeBy(1000)
+        Truth.assertThat(viewModel.taps.getValueForTest()).isEqualTo("1 taps")
     }
 }
