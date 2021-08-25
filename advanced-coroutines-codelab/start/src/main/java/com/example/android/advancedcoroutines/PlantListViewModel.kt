@@ -16,12 +16,9 @@
 
 package com.example.android.advancedcoroutines
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.switchMap
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
@@ -48,6 +45,7 @@ class PlantListViewModel internal constructor(
         get() = _snackbar
 
     private val _spinner = MutableLiveData<Boolean>(false)
+
     /**
      * Show a loading spinner if true
      */
@@ -70,35 +68,42 @@ class PlantListViewModel internal constructor(
         }
     }
 
+    private val growZoneFlow = MutableStateFlow<GrowZone>(NoGrowZone)
+
+    val plantsUsingFlow: LiveData<List<Plant>> = growZoneFlow.flatMapLatest { growZone ->
+        if (growZone == NoGrowZone) {
+            plantRepository.plantsFlow
+        } else {
+            plantRepository.getPlantsWithGrowZoneFlow(growZone)
+        }
+    }.asLiveData()
+
+
     init {
         // When creating a new ViewModel, clear the grow zone and perform any related udpates
         clearGrowZoneNumber()
+
+        growZoneFlow.mapLatest { growZone ->
+            _spinner.value = true
+            if (growZone == NoGrowZone) {
+                plantRepository.tryUpdateRecentPlantsCache()
+            } else {
+                plantRepository.tryUpdateRecentPlantsForGrowZoneCache(growZone)
+            }
+        }
+            .onEach { _spinner.value = false }
+            .catch { throwable -> _snackbar.value = throwable.message }
+            .launchIn(viewModelScope)
     }
 
-    /**
-     * Filter the list to this grow zone.
-     *
-     * In the starter code version, this will also start a network request. After refactoring,
-     * updating the grow zone will automatically kickoff a network request.
-     */
     fun setGrowZoneNumber(num: Int) {
         growZone.value = GrowZone(num)
-
-        // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
+        growZoneFlow.value = GrowZone(num)
     }
 
-    /**
-     * Clear the current filter of this plants list.
-     *
-     * In the starter code version, this will also start a network request. After refactoring,
-     * updating the grow zone will automatically kickoff a network request.
-     */
     fun clearGrowZoneNumber() {
         growZone.value = NoGrowZone
-
-        // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
+        growZoneFlow.value = NoGrowZone
     }
 
     /**
